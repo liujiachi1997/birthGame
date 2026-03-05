@@ -1,13 +1,13 @@
 :root {
-  --bg: #0f1220;
-  --card: #1a1f35;
-  --text: #f3f6ff;
-  --muted: #a8b2d1;
-  --primary: #5b8cff;
-  --primary-hover: #7aa0ff;
-  --success: #31c48d;
-  --danger: #ef476f;
-  --warning: #ffb703;
+  --bg: #1a1033;
+  --card: #26154a;
+  --text: #f7f3ff;
+  --muted: #cbbdf4;
+  --primary: #8b5cf6;
+  --primary-hover: #a78bfa;
+  --success: #6ee7b7;
+  --danger: #fb7185;
+  --warning: #fbbf24;
 }
 
 * {
@@ -17,7 +17,10 @@
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background: radial-gradient(circle at top, #1c2342 0%, var(--bg) 55%);
+  background:
+    radial-gradient(circle at 15% 10%, rgba(167, 139, 250, 0.28) 0%, rgba(167, 139, 250, 0) 38%),
+    radial-gradient(circle at 85% 0%, rgba(196, 181, 253, 0.22) 0%, rgba(196, 181, 253, 0) 40%),
+    linear-gradient(180deg, #2a1a53 0%, var(--bg) 60%);
   color: var(--text);
   min-height: 100vh;
 }
@@ -51,18 +54,19 @@ p {
 button {
   border: 0;
   border-radius: 10px;
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), #c084fc);
   color: #fff;
   padding: 10px 14px;
   cursor: pointer;
   font-weight: 700;
   text-decoration: none;
   transition: 0.2s;
+  box-shadow: 0 8px 18px rgba(139, 92, 246, 0.35);
 }
 
 .link-btn:hover,
 button:hover {
-  background: var(--primary-hover);
+  background: linear-gradient(135deg, var(--primary-hover), #d8b4fe);
   transform: translateY(-1px);
 }
 
@@ -73,11 +77,11 @@ button:hover {
 }
 
 .card {
-  background: linear-gradient(180deg, #1f2748 0%, var(--card) 100%);
-  border: 1px solid #2d3763;
+  background: linear-gradient(180deg, #352060 0%, var(--card) 100%);
+  border: 1px solid #5f42a6;
   border-radius: 16px;
   padding: 18px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 12px 28px rgba(23, 10, 48, 0.45);
 }
 
 .card h3 {
@@ -90,8 +94,8 @@ button:hover {
 }
 
 .panel {
-  background: var(--card);
-  border: 1px solid #2d3763;
+  background: rgba(38, 21, 74, 0.95);
+  border: 1px solid #6f54b6;
   border-radius: 14px;
   padding: 16px;
   margin-bottom: 14px;
@@ -106,9 +110,9 @@ button:hover {
 
 input,
 select {
-  background: #0f1530;
+  background: #2d1b57;
   color: #fff;
-  border: 1px solid #2f3a65;
+  border: 1px solid #8870cf;
   border-radius: 8px;
   padding: 9px 10px;
   min-width: 120px;
@@ -117,8 +121,8 @@ select {
 .badge {
   display: inline-block;
   border-radius: 999px;
-  background: #243267;
-  color: #d8e3ff;
+  background: #5a3f9b;
+  color: #efe8ff;
   padding: 4px 10px;
   font-size: 12px;
 }
@@ -152,8 +156,8 @@ select {
 canvas {
   display: block;
   max-width: 100%;
-  background: #0a0f25;
-  border: 1px solid #2f3a65;
+  background: #1f1242;
+  border: 1px solid #8870cf;
   border-radius: 10px;
 }
 

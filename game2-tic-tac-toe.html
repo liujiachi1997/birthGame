@@ -16,9 +16,52 @@
         font-size: 42px;
         font-weight: 700;
         border-radius: 12px;
-        border: 1px solid #334070;
-        background: #101735;
+        border: 1px solid #6f54b6;
+        background: #2b1a52;
         color: #fff;
+      }
+
+      .cell:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+      }
+
+      .gift-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 6, 24, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 999;
+      }
+
+      .gift-modal.show {
+        display: flex;
+      }
+
+      .gift-modal-card {
+        width: min(460px, 92vw);
+        background: linear-gradient(180deg, #3b246d 0%, #26154a 100%);
+        border: 1px solid #8d70d6;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 16px 40px rgba(18, 10, 40, 0.45);
+      }
+
+      .gift-modal-card h3 {
+        margin-bottom: 10px;
+      }
+
+      .gift-modal-card p {
+        color: #e9ddff;
+        line-height: 1.7;
+      }
+
+      .gift-modal-card .hint {
+        color: #cbbdf4;
+        font-size: 14px;
       }
     </style>
   </head>
@@ -30,7 +73,7 @@
       </div>
 
       <div class="panel">
-        <p id="status" class="status">当前回合：X</p>
+        <p id="status" class="status">你的回合：X</p>
         <button id="resetBtn">重新开始</button>
       </div>
 
@@ -39,14 +82,32 @@
       </div>
     </div>
 
+    <div id="giftModal" class="gift-modal" role="dialog" aria-modal="true" aria-labelledby="giftTitle">
+      <div class="gift-modal-card">
+        <h3 id="giftTitle">🎁 挑战成功！</h3>
+        <p>
+          宝宝你太厉害啦，礼物藏在：
+          <strong>客厅沙发左边靠垫下面</strong>
+          ，快去找找看 ❤️
+        </p>
+        <p class="hint">提示：如果没看到，再摸一下靠近扶手的位置。</p>
+        <button id="closeModalBtn">我知道啦</button>
+      </div>
+    </div>
+
     <script>
       const boardEl = document.getElementById('board');
       const statusEl = document.getElementById('status');
       const resetBtn = document.getElementById('resetBtn');
+      const giftModalEl = document.getElementById('giftModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+
+      const HUMAN = 'X';
+      const AI = 'O';
 
       let board = Array(9).fill('');
-      let current = 'X';
       let ended = false;
+      let waitingAI = false;
 
       const lines = [
         [0, 1, 2],
@@ -69,46 +130,131 @@
         return null;
       }
 
+      function updateStatus(text, type = 'status') {
+        statusEl.textContent = text;
+        statusEl.className = type;
+      }
+
+      function showGiftModal() {
+        giftModalEl.classList.add('show');
+      }
+
+      function hideGiftModal() {
+        giftModalEl.classList.remove('show');
+      }
+
       function render() {
         boardEl.innerHTML = '';
         board.forEach((v, i) => {
           const btn = document.createElement('button');
           btn.className = 'cell';
           btn.textContent = v;
-          btn.addEventListener('click', () => move(i));
+          btn.disabled = Boolean(v) || ended || waitingAI;
+          btn.addEventListener('click', () => humanMove(i));
           boardEl.appendChild(btn);
         });
       }
 
-      function move(i) {
-        if (ended || board[i]) return;
-        board[i] = current;
-        const result = checkWinner();
-        if (result === 'X' || result === 'O') {
-          ended = true;
-          statusEl.textContent = `胜者：${result}`;
-          statusEl.className = 'status success';
-        } else if (result === 'draw') {
-          ended = true;
-          statusEl.textContent = '平局！';
-          statusEl.className = 'status warning';
+      function finishGame(result) {
+        ended = true;
+        waitingAI = false;
+        if (result === HUMAN) {
+          updateStatus('你赢了！太棒啦 🎉', 'status success');
+          showGiftModal();
+        } else if (result === AI) {
+          updateStatus('电脑赢了，再来一局！', 'status danger');
         } else {
-          current = current === 'X' ? 'O' : 'X';
-          statusEl.textContent = `当前回合：${current}`;
-          statusEl.className = 'status';
+          updateStatus('平局！差一点就赢了～', 'status warning');
         }
         render();
       }
 
-      function reset() {
-        board = Array(9).fill('');
-        current = 'X';
-        ended = false;
-        statusEl.textContent = '当前回合：X';
-        statusEl.className = 'status';
+      function aiChooseMove() {
+        const empty = board
+          .map((v, i) => (v ? -1 : i))
+          .filter(i => i !== -1);
+
+        const AI_BLOCK_CHANCE = 0.55;
+        const AI_RANDOM_CHANCE = 0.25;
+
+        const findCriticalMove = target => {
+          for (const [a, b, c] of lines) {
+            const line = [board[a], board[b], board[c]];
+            if (line.filter(v => v === target).length === 2 && line.includes('')) {
+              return [a, b, c][line.indexOf('')];
+            }
+          }
+          return undefined;
+        };
+
+        const winMove = findCriticalMove(AI);
+        if (winMove !== undefined) return winMove;
+
+        const blockMove = findCriticalMove(HUMAN);
+        if (blockMove !== undefined && Math.random() < AI_BLOCK_CHANCE) {
+          return blockMove;
+        }
+
+        if (Math.random() < AI_RANDOM_CHANCE) {
+          return empty[Math.floor(Math.random() * empty.length)];
+        }
+
+        if (board[4] === '') return 4;
+
+        const corners = [0, 2, 6, 8].filter(i => board[i] === '');
+        if (corners.length) {
+          return corners[Math.floor(Math.random() * corners.length)];
+        }
+
+        return empty[Math.floor(Math.random() * empty.length)];
+      }
+
+      function aiMove() {
+        if (ended) return;
+        const idx = aiChooseMove();
+        if (idx === undefined) return;
+        board[idx] = AI;
+
+        const result = checkWinner();
+        if (result) {
+          finishGame(result);
+          return;
+        }
+
+        waitingAI = false;
+        updateStatus('你的回合：X');
         render();
       }
 
+      function humanMove(i) {
+        if (ended || waitingAI || board[i]) return;
+
+        board[i] = HUMAN;
+        const result = checkWinner();
+        if (result) {
+          finishGame(result);
+          return;
+        }
+
+        waitingAI = true;
+        updateStatus('电脑思考中…');
+        render();
+        setTimeout(aiMove, 420);
+      }
+
+      function reset() {
+        board = Array(9).fill('');
+        ended = false;
+        waitingAI = false;
+        hideGiftModal();
+        updateStatus('你的回合：X');
+        render();
+      }
+
+      closeModalBtn.addEventListener('click', hideGiftModal);
+      giftModalEl.addEventListener('click', e => {
+        if (e.target === giftModalEl) hideGiftModal();
+      });
       resetBtn.addEventListener('click', reset);
       reset();
     </script>

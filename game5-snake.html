@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>贪吃蛇</title>
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .gift-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 6, 24, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 999;
+      }
+      .gift-modal.show { display: flex; }
+      .gift-modal-card {
+        width: min(460px, 92vw);
+        background: linear-gradient(180deg, #3b246d 0%, #26154a 100%);
+        border: 1px solid #8d70d6;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 16px 40px rgba(18, 10, 40, 0.45);
+      }
+      .gift-modal-card h3 { margin-bottom: 10px; }
+      .gift-modal-card p { color: #e9ddff; line-height: 1.7; }
+      .gift-modal-card .hint { color: #cbbdf4; font-size: 14px; }
+    </style>
   </head>
   <body>
     <div class="container">
@@ -21,6 +45,17 @@
       <div class="panel">
         <canvas id="canvas" width="420" height="420"></canvas>
         <p id="status" class="status">方向键控制移动，避免撞墙或撞到自己。</p>
+        <p class="footer-note">🎯 挑战目标：得分超过 9 分</p>
+      </div>
+    </div>
+
+    <!-- 礼物弹窗 -->
+    <div id="giftModal" class="gift-modal" role="dialog" aria-modal="true">
+      <div class="gift-modal-card">
+        <h3>🎁 挑战成功！</h3>
+        <p>贪吃蛇高手！礼物藏在：<strong>鞋柜最上层的鞋盒里</strong>，快去找找看 ❤️</p>
+        <p class="hint">提示：是那个紫色包装的盒子哦～</p>
+        <button id="closeModalBtn">我知道啦</button>
       </div>
     </div>
 
@@ -30,6 +65,10 @@
       const scoreEl = document.getElementById('score');
       const statusEl = document.getElementById('status');
       const restartBtn = document.getElementById('restartBtn');
+      const giftModalEl = document.getElementById('giftModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+
+      const CHALLENGE_SCORE = 9;
 
       const size = 21;
       const cell = 20;
@@ -65,8 +104,8 @@
           }
         }
 
-        drawCell(food.x, food.y, '#ef476f');
-        snake.forEach((part, i) => drawCell(part.x, part.y, i === 0 ? '#31c48d' : '#5b8cff'));
+        drawCell(food.x, food.y, '#c084fc');
+        snake.forEach((part, i) => drawCell(part.x, part.y, i === 0 ? '#a78bfa' : '#7c5ae0'));
       }
 
       function step() {
@@ -101,8 +140,14 @@
       function gameOver(text) {
         ended = true;
         clearInterval(timer);
-        statusEl.textContent = text;
-        statusEl.className = 'status danger';
+        if (score > CHALLENGE_SCORE) {
+          statusEl.textContent = `${text} 最终得分 ${score} 分，挑战成功！🎉`;
+          statusEl.className = 'status success';
+          giftModalEl.classList.add('show');
+        } else {
+          statusEl.textContent = `${text} 得分 ${score} 分，需要超过 ${CHALLENGE_SCORE} 分才能通关哦～`;
+          statusEl.className = 'status danger';
+        }
       }
 
       function init() {
@@ -119,6 +164,7 @@
         scoreEl.textContent = '0';
         statusEl.textContent = '方向键控制移动，避免撞墙或撞到自己。';
         statusEl.className = 'status';
+        giftModalEl.classList.remove('show');
         placeFood();
         render();
         timer = setInterval(step, 120);
@@ -139,6 +185,10 @@
       });
 
       restartBtn.addEventListener('click', init);
+      closeModalBtn.addEventListener('click', () => giftModalEl.classList.remove('show'));
+      giftModalEl.addEventListener('click', e => {
+        if (e.target === giftModalEl) giftModalEl.classList.remove('show');
+      });
       init();
     </script>
   </body>

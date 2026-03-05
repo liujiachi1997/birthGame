@@ -7,16 +7,25 @@
     <link rel="stylesheet" href="./styles.css" />
     <style>
       .grid2048 {
-        display: grid;
-        grid-template-columns: repeat(4, 76px);
-        gap: 8px;
-        background: #263056;
+        position: relative;
+        width: 344px;
+        height: 344px;
+        background: #2f1f5f;
         padding: 8px;
         border-radius: 12px;
-        width: max-content;
+      }
+
+      /* 底层空位背景格子 */
+      .cell-bg {
+        position: absolute;
+        width: 76px;
+        height: 76px;
+        border-radius: 10px;
+        background: #3f2b75;
       }
 
       .tile {
+        position: absolute;
         width: 76px;
         height: 76px;
         border-radius: 10px;
@@ -26,8 +35,56 @@
         font-weight: 800;
         font-size: 22px;
         color: #fff;
-        background: #34406f;
+        background: #3f2b75;
+        transition: left 0.15s ease, top 0.15s ease;
+        z-index: 1;
       }
+
+      /* 新方块弹入动画 */
+      .tile.tile-new {
+        animation: tile-appear 0.2s ease;
+      }
+
+      @keyframes tile-appear {
+        0% { transform: scale(0); opacity: 0; }
+        60% { transform: scale(1.15); }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      /* 合并弹跳动画 */
+      .tile.tile-merged {
+        animation: tile-merge 0.2s ease;
+        z-index: 2;
+      }
+
+      @keyframes tile-merge {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.25); }
+        100% { transform: scale(1); }
+      }
+
+      .gift-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 6, 24, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 999;
+      }
+      .gift-modal.show { display: flex; }
+      .gift-modal-card {
+        width: min(460px, 92vw);
+        background: linear-gradient(180deg, #3b246d 0%, #26154a 100%);
+        border: 1px solid #8d70d6;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 16px 40px rgba(18, 10, 40, 0.45);
+      }
+      .gift-modal-card h3 { margin-bottom: 10px; }
+      .gift-modal-card p { color: #e9ddff; line-height: 1.7; }
+      .gift-modal-card .hint { color: #cbbdf4; font-size: 14px; }
     </style>
   </head>
   <body>
@@ -45,6 +102,17 @@
       <div class="panel">
         <div id="grid" class="grid2048"></div>
         <p id="status" class="status">使用方向键（↑↓←→）移动。</p>
+        <p class="footer-note">🎯 挑战目标：总分达到 3000 分</p>
+      </div>
+    </div>
+
+    <!-- 礼物弹窗 -->
+    <div id="giftModal" class="gift-modal" role="dialog" aria-modal="true">
+      <div class="gift-modal-card">
+        <h3>🎁 挑战成功！</h3>
+        <p>2048大师！礼物藏在：<strong>床头柜的小盒子里</strong>，快去找找看 ❤️</p>
+        <p class="hint">提示：打开盒子记得仔细看最底层～</p>
+        <button id="closeModalBtn">我知道啦</button>
       </div>
     </div>
 
@@ -53,130 +121,262 @@
       const scoreEl = document.getElementById('score');
       const statusEl = document.getElementById('status');
       const restartBtn = document.getElementById('restartBtn');
+      const giftModalEl = document.getElementById('giftModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
 
-      let board = [];
+      const CHALLENGE_SCORE = 3000;
+      const CELL_SIZE = 76;
+      const GAP = 8;
+      const ANIM_DURATION = 150; // 与 CSS transition 时长一致
+
+      let board = [];     // 4x4 数值矩阵
       let score = 0;
       let ended = false;
+      let animating = false; // 防止动画期间重复操作
 
-      function emptyCells() {
-        const cells = [];
-        for (let r = 0; r < 4; r++) {
-          for (let c = 0; c < 4; c++) {
-            if (board[r][c] === 0) cells.push([r, c]);
-          }
-        }
-        return cells;
-      }
+      // =========== 工具函数 ===========
 
-      function addRandomTile() {
-        const cells = emptyCells();
-        if (!cells.length) return;
-        const [r, c] = cells[Math.floor(Math.random() * cells.length)];
-        board[r][c] = Math.random() < 0.9 ? 2 : 4;
+      function pos(rc) {
+        // 根据行列算出 left / top 像素值
+        return GAP + rc * (CELL_SIZE + GAP);
       }
 
       function colorOf(v) {
         const map = {
-          0: '#34406f',
-          2: '#5b6fae',
-          4: '#6a80c5',
-          8: '#7c6dd4',
-          16: '#8c63da',
-          32: '#a45fd9',
-          64: '#c35acc',
-          128: '#e15bad',
-          256: '#eb6b86',
-          512: '#f08a5d',
-          1024: '#f7b267',
-          2048: '#ffd166'
+          0: '#3f2b75', 2: '#4b3290', 4: '#5a3ca8',
+          8: '#6745ba', 16: '#7550cc', 32: '#8560dc',
+          64: '#9872e8', 128: '#ad87f0', 256: '#c0a0f7',
+          512: '#d2b7fb', 1024: '#e1cdfd', 2048: '#f0e5ff'
         };
-        return map[v] || '#f94144';
+        return map[v] || '#c4b5fd';
       }
 
-      function render() {
-        gridEl.innerHTML = '';
+      function emptyCells() {
+        const cells = [];
+        for (let r = 0; r < 4; r++)
+          for (let c = 0; c < 4; c++)
+            if (board[r][c] === 0) cells.push([r, c]);
+        return cells;
+      }
+
+      // =========== 渲染 ===========
+
+      function drawBackground() {
+        // 只画一次底层灰格
         for (let r = 0; r < 4; r++) {
           for (let c = 0; c < 4; c++) {
-            const v = board[r][c];
-            const div = document.createElement('div');
-            div.className = 'tile';
-            div.textContent = v === 0 ? '' : String(v);
-            div.style.background = colorOf(v);
-            div.style.color = v >= 128 ? '#2a1b00' : '#fff';
-            gridEl.appendChild(div);
+            const bg = document.createElement('div');
+            bg.className = 'cell-bg';
+            bg.style.left = pos(c) + 'px';
+            bg.style.top = pos(r) + 'px';
+            gridEl.appendChild(bg);
+          }
+        }
+      }
+
+      function createTileEl(value, row, col, extra) {
+        const div = document.createElement('div');
+        div.className = 'tile' + (extra ? ' ' + extra : '');
+        div.textContent = value === 0 ? '' : String(value);
+        div.style.left = pos(col) + 'px';
+        div.style.top = pos(row) + 'px';
+        div.style.background = colorOf(value);
+        div.style.color = value >= 128 ? '#2a1b00' : '#fff';
+        return div;
+      }
+
+      function renderStatic() {
+        // 清除所有方块（保留背景格）
+        gridEl.querySelectorAll('.tile').forEach(el => el.remove());
+        for (let r = 0; r < 4; r++) {
+          for (let c = 0; c < 4; c++) {
+            if (board[r][c] !== 0) {
+              gridEl.appendChild(createTileEl(board[r][c], r, c));
+            }
           }
         }
         scoreEl.textContent = String(score);
       }
 
-      function compress(row) {
-        const filtered = row.filter((n) => n !== 0);
-        for (let i = 0; i < filtered.length - 1; i++) {
-          if (filtered[i] === filtered[i + 1]) {
-            filtered[i] *= 2;
-            score += filtered[i];
-            filtered[i + 1] = 0;
+      // =========== 核心移动逻辑（带轨迹记录） ===========
+
+      function compressRow(row) {
+        // 返回 { result, moves }
+        // moves: [{ from, to, merged }]
+        const moves = [];
+        const filtered = [];
+        const fromIdx = [];
+
+        // 1. 去零，记录来源索引
+        for (let i = 0; i < 4; i++) {
+          if (row[i] !== 0) {
+            fromIdx.push(i);
+            filtered.push(row[i]);
           }
         }
-        const merged = filtered.filter((n) => n !== 0);
-        while (merged.length < 4) merged.push(0);
-        return merged;
-      }
 
-      function rotateRight(mat) {
-        const res = Array.from({ length: 4 }, () => Array(4).fill(0));
-        for (let r = 0; r < 4; r++) {
-          for (let c = 0; c < 4; c++) {
-            res[c][3 - r] = mat[r][c];
+        // 2. 合并相邻相同
+        const result = [];
+        const mergedFlags = [];
+        let i = 0;
+        let destIdx = 0;
+        while (i < filtered.length) {
+          if (i + 1 < filtered.length && filtered[i] === filtered[i + 1]) {
+            const merged = filtered[i] * 2;
+            result.push(merged);
+            mergedFlags.push(true);
+            moves.push({ from: fromIdx[i], to: destIdx, merged: false });
+            moves.push({ from: fromIdx[i + 1], to: destIdx, merged: true });
+            score += merged;
+            i += 2;
+          } else {
+            result.push(filtered[i]);
+            mergedFlags.push(false);
+            moves.push({ from: fromIdx[i], to: destIdx, merged: false });
+            i += 1;
           }
+          destIdx++;
         }
-        return res;
+
+        while (result.length < 4) result.push(0);
+        return { result, moves };
       }
 
-      function rotateLeft(mat) {
-        const res = Array.from({ length: 4 }, () => Array(4).fill(0));
-        for (let r = 0; r < 4; r++) {
-          for (let c = 0; c < 4; c++) {
-            res[3 - c][r] = mat[r][c];
-          }
-        }
-        return res;
+      // 将方向统一转换为"向左压缩"的坐标映射
+      function getCoordMapper(dir) {
+        // 返回 { toRow(r, c), toCol(r, c), fromRow(r, c), fromCol(r, c) }
+        // 让行列在逻辑上都变成"向左"
+        if (dir === 'left') return {
+          getRow: (r, c) => [r, c],
+          setRow: (r, c) => [r, c]
+        };
+        if (dir === 'right') return {
+          getRow: (r, c) => [r, 3 - c],
+          setRow: (r, c) => [r, 3 - c]
+        };
+        if (dir === 'up') return {
+          getRow: (r, c) => [c, r],  // 转置：行变列
+          setRow: (r, c) => [c, r]
+        };
+        if (dir === 'down') return {
+          getRow: (r, c) => [3 - c, r],
+          setRow: (r, c) => [3 - c, r]
+        };
       }
 
-      function clone(mat) {
-        return mat.map((row) => [...row]);
-      }
-
-      function moveLeft() {
-        const old = JSON.stringify(board);
-        board = board.map((row) => compress(row));
-        return old !== JSON.stringify(board);
-      }
-
-      function move(dir) {
-        if (ended) return;
+      function moveBoard(dir) {
+        // 返回 { moved, tileAnimations, mergedPositions, newBoard }
+        const mapper = getCoordMapper(dir);
+        const tileAnimations = []; // { fromR, fromC, toR, toC, value, isMerge }
+        const mergedPositions = []; // { r, c, value }
+        const newBoard = Array.from({ length: 4 }, () => Array(4).fill(0));
         let moved = false;
-        if (dir === 'left') moved = moveLeft();
-        if (dir === 'right') {
-          board = board.map((r) => r.reverse());
-          moved = moveLeft();
-          board = board.map((r) => r.reverse());
-        }
-        if (dir === 'up') {
-          board = rotateLeft(board);
-          moved = moveLeft();
-          board = rotateRight(board);
-        }
-        if (dir === 'down') {
-          board = rotateRight(board);
-          moved = moveLeft();
-          board = rotateLeft(board);
+
+        for (let r = 0; r < 4; r++) {
+          // 提取逻辑行
+          const logicalRow = [];
+          for (let c = 0; c < 4; c++) {
+            const [br, bc] = mapper.getRow(r, c);
+            logicalRow.push(board[br][bc]);
+          }
+
+          const { result, moves } = compressRow(logicalRow);
+
+          // 写入新棋盘
+          for (let c = 0; c < 4; c++) {
+            const [br, bc] = mapper.setRow(r, c);
+            newBoard[br][bc] = result[c];
+          }
+
+          // 记录动画轨迹
+          for (const m of moves) {
+            const [fromR, fromC] = mapper.setRow(r, m.from);
+            const [toR, toC] = mapper.setRow(r, m.to);
+            const value = board[fromR][fromC];
+            if (fromR !== toR || fromC !== toC) moved = true;
+            tileAnimations.push({ fromR, fromC, toR, toC, value, isMerge: m.merged });
+            if (m.merged) {
+              const mergeVal = result[m.to] !== undefined ? result[m.to] : value * 2;
+              // 找最终合并值
+              const [mR, mC] = mapper.setRow(r, m.to);
+              mergedPositions.push({ r: mR, c: mC, value: newBoard[mR][mC] });
+            }
+          }
+
+          // 检测是否有变化
+          for (let c = 0; c < 4; c++) {
+            const [br, bc] = mapper.setRow(r, c);
+            if (board[br][bc] !== newBoard[br][bc]) moved = true;
+          }
         }
 
-        if (moved) addRandomTile();
-        render();
-        checkState();
+        return { moved, tileAnimations, mergedPositions, newBoard };
       }
+
+      // =========== 动画执行 ===========
+
+      function animateMove(dir, callback) {
+        const { moved, tileAnimations, mergedPositions, newBoard } = moveBoard(dir);
+
+        if (!moved) {
+          callback(false);
+          return;
+        }
+
+        // 1. 清除旧方块
+        gridEl.querySelectorAll('.tile').forEach(el => el.remove());
+
+        // 2. 在旧位置创建方块元素，然后滑动到新位置
+        const tileEls = [];
+        for (const anim of tileAnimations) {
+          const el = createTileEl(anim.value, anim.fromR, anim.fromC);
+          gridEl.appendChild(el);
+          tileEls.push({ el, anim });
+        }
+
+        // 强制重排后设置新位置触发 transition
+        void gridEl.offsetHeight;
+
+        for (const { el, anim } of tileEls) {
+          el.style.left = pos(anim.toC) + 'px';
+          el.style.top = pos(anim.toR) + 'px';
+        }
+
+        // 3. 动画结束后更新棋盘数据并渲染最终状态
+        setTimeout(() => {
+          board = newBoard;
+
+          // 添加随机新方块
+          const cells = emptyCells();
+          let newTileR = -1, newTileC = -1;
+          if (cells.length) {
+            const [nr, nc] = cells[Math.floor(Math.random() * cells.length)];
+            board[nr][nc] = Math.random() < 0.9 ? 2 : 4;
+            newTileR = nr;
+            newTileC = nc;
+          }
+
+          // 重新渲染
+          gridEl.querySelectorAll('.tile').forEach(el => el.remove());
+          for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+              if (board[r][c] !== 0) {
+                let extra = '';
+                if (r === newTileR && c === newTileC) {
+                  extra = 'tile-new';
+                } else if (mergedPositions.some(p => p.r === r && p.c === c)) {
+                  extra = 'tile-merged';
+                }
+                gridEl.appendChild(createTileEl(board[r][c], r, c, extra));
+              }
+            }
+          }
+          scoreEl.textContent = String(score);
+          callback(true);
+        }, ANIM_DURATION + 20);
+      }
+
+      // =========== 游戏状态 ===========
 
       function hasMoves() {
         if (emptyCells().length) return true;
@@ -200,28 +400,77 @@
         }
         if (!hasMoves()) {
           ended = true;
-          statusEl.textContent = '游戏结束，已无可移动位置。';
-          statusEl.className = 'status danger';
+          if (score >= CHALLENGE_SCORE) {
+            statusEl.textContent = `游戏结束，最终得分 ${score} 分，挑战成功！🎉`;
+            statusEl.className = 'status success';
+            giftModalEl.classList.add('show');
+          } else {
+            statusEl.textContent = `游戏结束，得分 ${score} 分，未达到 ${CHALLENGE_SCORE} 分，再来一局！`;
+            statusEl.className = 'status danger';
+          }
         }
       }
+
+      function move(dir) {
+        if (ended || animating) return;
+        animating = true;
+
+        animateMove(dir, (moved) => {
+          animating = false;
+          if (moved) checkState();
+        });
+      }
+
+      // =========== 触摸滑动支持 ===========
+
+      let touchStartX = 0, touchStartY = 0;
+
+      gridEl.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }, { passive: true });
+
+      gridEl.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        if (Math.max(absDx, absDy) < 30) return; // 太短不算滑动
+        if (absDx > absDy) {
+          move(dx > 0 ? 'right' : 'left');
+        } else {
+          move(dy > 0 ? 'down' : 'up');
+        }
+      }, { passive: true });
+
+      // =========== 初始化 ===========
 
       function init() {
         board = Array.from({ length: 4 }, () => Array(4).fill(0));
         score = 0;
         ended = false;
-        statusEl.textContent = '使用方向键（↑↓←→）移动。';
+        animating = false;
+        statusEl.textContent = '使用方向键（↑↓←→）或滑动移动。';
         statusEl.className = 'status';
+        giftModalEl.classList.remove('show');
+        gridEl.innerHTML = '';
+        drawBackground();
         addRandomTile();
         addRandomTile();
-        render();
+        renderStatic();
+      }
+
+      function addRandomTile() {
+        const cells = emptyCells();
+        if (!cells.length) return;
+        const [r, c] = cells[Math.floor(Math.random() * cells.length)];
+        board[r][c] = Math.random() < 0.9 ? 2 : 4;
       }
 
       document.addEventListener('keydown', (e) => {
         const map = {
-          ArrowLeft: 'left',
-          ArrowRight: 'right',
-          ArrowUp: 'up',
-          ArrowDown: 'down'
+          ArrowLeft: 'left', ArrowRight: 'right',
+          ArrowUp: 'up', ArrowDown: 'down'
         };
         const dir = map[e.key];
         if (!dir) return;
@@ -230,6 +479,10 @@
       });
 
       restartBtn.addEventListener('click', init);
+      closeModalBtn.addEventListener('click', () => giftModalEl.classList.remove('show'));
+      giftModalEl.addEventListener('click', e => {
+        if (e.target === giftModalEl) giftModalEl.classList.remove('show');
+      });
       init();
     </script>
   </body>

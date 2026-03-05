@@ -146,3 +146,19 @@ git push
 - 页面 404：确认仓库名、用户名、URL 路径大小写完全一致。
 - 刚部署打不开：通常是还在发布，等 1~3 分钟后刷新。
 - 样式丢失：确认 `styles.css` 已提交且页面中引用路径正确。
+
+
+
+https://liujiachi1997.github.io/birthGame/game1-guess-number.html
+
+https://liujiachi1997.github.io/birthGame/game2-tic-tac-toe.html
+
+https://liujiachi1997.github.io/birthGame/game3-memory.html
+
+https://liujiachi1997.github.io/birthGame/game4-2048.html
+
+https://liujiachi1997.github.io/birthGame/game5-snake.html
+
+https://liujiachi1997.github.io/birthGame/game6-reaction.html
+
+https://liujiachi1997.github.io/birthGame/index.html

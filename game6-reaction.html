@@ -3,117 +3,286 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>反应速度测试</title>
+    <title>打地鼠</title>
     <link rel="stylesheet" href="./styles.css" />
     <style>
-      .reaction-box {
-        width: min(520px, 90vw);
-        height: 260px;
-        border-radius: 14px;
-        border: 1px solid #334070;
+      .mole-board {
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        gap: 12px;
+        justify-content: center;
+      }
+
+      .mole-hole {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: #2b1a52;
+        border: 2px solid #6f54b6;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 26px;
-        font-weight: 800;
-        user-select: none;
+        font-size: 48px;
         cursor: pointer;
-        background: #7a1f2a;
+        user-select: none;
+        transition: background 0.15s, transform 0.1s;
       }
+
+      .mole-hole:hover {
+        transform: scale(1.05);
+      }
+
+      .mole-hole.active {
+        background: #7c5ae0;
+        animation: mole-pop 0.2s ease-out;
+      }
+
+      .mole-hole.hit {
+        background: #a78bfa;
+      }
+
+      @keyframes mole-pop {
+        0% { transform: scale(0.6); }
+        100% { transform: scale(1); }
+      }
+
+      .timer-bar {
+        width: 100%;
+        height: 10px;
+        background: #3f2b75;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-top: 12px;
+      }
+
+      .timer-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, #a78bfa, #c084fc);
+        border-radius: 5px;
+        transition: width 0.1s linear;
+      }
+
+      .gift-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 6, 24, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 999;
+      }
+      .gift-modal.show { display: flex; }
+      .gift-modal-card {
+        width: min(460px, 92vw);
+        background: linear-gradient(180deg, #3b246d 0%, #26154a 100%);
+        border: 1px solid #8d70d6;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 16px 40px rgba(18, 10, 40, 0.45);
+      }
+      .gift-modal-card h3 { margin-bottom: 10px; }
+      .gift-modal-card p { color: #e9ddff; line-height: 1.7; }
+      .gift-modal-card .hint { color: #cbbdf4; font-size: 14px; }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="topbar">
-        <h1>⚡ 反应速度测试</h1>
+        <h1>🔨 打地鼠</h1>
         <a class="link-btn" href="./index.html">返回首页</a>
       </div>
 
       <div class="panel row">
-        <button id="startBtn">开始测试</button>
-        <button id="resetBtn">清空记录</button>
-        <span>最佳成绩：<strong id="best">--</strong></span>
+        <span>得分：<strong id="score">0</strong></span>
+        <span>剩余时间：<strong id="timeLeft">30</strong> 秒</span>
+        <button id="startBtn">开始游戏</button>
+        <button id="restartBtn">重新开始</button>
       </div>
 
       <div class="panel">
-        <div id="box" class="reaction-box">点击“开始测试”</div>
-        <p id="status" class="status"></p>
+        <div id="board" class="mole-board"></div>
+        <div class="timer-bar">
+          <div id="timerBar" class="timer-bar-inner" style="width:100%"></div>
+        </div>
+        <p id="status" class="status">点击"开始游戏"来挑战！</p>
+        <p class="footer-note">🎯 挑战目标：30 秒内打中 15 只以上地鼠</p>
+      </div>
+    </div>
+
+    <!-- 礼物弹窗 -->
+    <div id="giftModal" class="gift-modal" role="dialog" aria-modal="true">
+      <div class="gift-modal-card">
+        <h3>🎁 挑战成功！</h3>
+        <p>打地鼠冠军！礼物藏在：<strong>阳台花盆的旁边</strong>，快去找找看 ❤️</p>
+        <p class="hint">提示：就在那盆最大的绿植后面哦～</p>
+        <button id="closeModalBtn">我知道啦</button>
       </div>
     </div>
 
     <script>
-      const startBtn = document.getElementById('startBtn');
-      const resetBtn = document.getElementById('resetBtn');
-      const box = document.getElementById('box');
+      const boardEl = document.getElementById('board');
+      const scoreEl = document.getElementById('score');
+      const timeLeftEl = document.getElementById('timeLeft');
+      const timerBarEl = document.getElementById('timerBar');
       const statusEl = document.getElementById('status');
-      const bestEl = document.getElementById('best');
+      const startBtn = document.getElementById('startBtn');
+      const restartBtn = document.getElementById('restartBtn');
+      const giftModalEl = document.getElementById('giftModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
 
-      let waiting = false;
-      let ready = false;
-      let startTime = 0;
-      let timer = null;
-      let best = null;
+      const TOTAL_TIME = 30;
+      const CHALLENGE_SCORE = 15;
+      const HOLES = 9;
 
-      function setBox(text, bg) {
-        box.textContent = text;
-        box.style.background = bg;
+      let score = 0;
+      let timeLeft = TOTAL_TIME;
+      let gameTimer = null;
+      let moleTimer = null;
+      let activeMole = -1;
+      let playing = false;
+
+      // 初始化棋盘
+      function initBoard() {
+        boardEl.innerHTML = '';
+        for (let i = 0; i < HOLES; i++) {
+          const div = document.createElement('div');
+          div.className = 'mole-hole';
+          div.textContent = '🕳️';
+          div.addEventListener('click', () => whack(i));
+          boardEl.appendChild(div);
+        }
       }
 
-      function start() {
-        clearTimeout(timer);
-        waiting = true;
-        ready = false;
-        setBox('等待变绿后点击！', '#7a1f2a');
-        statusEl.textContent = '';
-
-        const delay = 1200 + Math.random() * 2200;
-        timer = setTimeout(() => {
-          waiting = false;
-          ready = true;
-          startTime = performance.now();
-          setBox('现在点击！', '#156f44');
-        }, delay);
+      function getHoles() {
+        return boardEl.querySelectorAll('.mole-hole');
       }
 
-      function handleClickBox() {
-        if (waiting) {
-          clearTimeout(timer);
-          waiting = false;
-          setBox('太快了！请重新开始', '#7a1f2a');
-          statusEl.textContent = '你抢跑了。';
+      function showMole() {
+        const holes = getHoles();
+        // 清除之前的地鼠
+        if (activeMole >= 0) {
+          holes[activeMole].classList.remove('active');
+          holes[activeMole].textContent = '🕳️';
+        }
+
+        // 随机选一个新洞
+        let next;
+        do {
+          next = Math.floor(Math.random() * HOLES);
+        } while (next === activeMole);
+
+        activeMole = next;
+        holes[activeMole].classList.add('active');
+        holes[activeMole].textContent = '🐹';
+
+        // 地鼠出现时间随分数递减，越来越快
+        const interval = Math.max(500, 1000 - score * 25);
+        moleTimer = setTimeout(() => {
+          if (!playing) return;
+          // 地鼠缩回
+          holes[activeMole].classList.remove('active');
+          holes[activeMole].textContent = '🕳️';
+          activeMole = -1;
+          showMole();
+        }, interval);
+      }
+
+      function whack(index) {
+        if (!playing || index !== activeMole) return;
+
+        const holes = getHoles();
+        clearTimeout(moleTimer);
+
+        score++;
+        scoreEl.textContent = String(score);
+
+        // 打中效果
+        holes[index].classList.remove('active');
+        holes[index].classList.add('hit');
+        holes[index].textContent = '💥';
+
+        setTimeout(() => {
+          holes[index].classList.remove('hit');
+          holes[index].textContent = '🕳️';
+          activeMole = -1;
+          if (playing) showMole();
+        }, 300);
+      }
+
+      function updateTimer() {
+        timeLeft--;
+        timeLeftEl.textContent = String(timeLeft);
+        timerBarEl.style.width = ((timeLeft / TOTAL_TIME) * 100) + '%';
+
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }
+
+      function endGame() {
+        playing = false;
+        clearInterval(gameTimer);
+        clearTimeout(moleTimer);
+
+        const holes = getHoles();
+        if (activeMole >= 0) {
+          holes[activeMole].classList.remove('active');
+          holes[activeMole].textContent = '🕳️';
+          activeMole = -1;
+        }
+
+        if (score >= CHALLENGE_SCORE) {
+          statusEl.textContent = `时间到！最终得分 ${score} 分，挑战成功！🎉`;
+          statusEl.className = 'status success';
+          giftModalEl.classList.add('show');
+        } else {
+          statusEl.textContent = `时间到！得分 ${score} 分，需要 ${CHALLENGE_SCORE} 分才能通关，再来一次！`;
           statusEl.className = 'status danger';
-          return;
-        }
-
-        if (!ready) return;
-
-        const ms = Math.round(performance.now() - startTime);
-        ready = false;
-        setBox('点击“开始测试”再来一局', '#1c2a61');
-        statusEl.textContent = `你的反应时间：${ms} ms`;
-        statusEl.className = 'status success';
-
-        if (best === null || ms < best) {
-          best = ms;
-          bestEl.textContent = `${best} ms`;
         }
       }
 
-      function reset() {
-        clearTimeout(timer);
-        waiting = false;
-        ready = false;
-        best = null;
-        bestEl.textContent = '--';
-        statusEl.textContent = '';
+      function startGame() {
+        if (playing) return;
+        playing = true;
+        score = 0;
+        timeLeft = TOTAL_TIME;
+        scoreEl.textContent = '0';
+        timeLeftEl.textContent = String(TOTAL_TIME);
+        timerBarEl.style.width = '100%';
+        statusEl.textContent = '快打地鼠！🔨';
         statusEl.className = 'status';
-        setBox('点击“开始测试”', '#1c2a61');
+        giftModalEl.classList.remove('show');
+
+        initBoard();
+        showMole();
+        gameTimer = setInterval(updateTimer, 1000);
       }
 
-      startBtn.addEventListener('click', start);
-      resetBtn.addEventListener('click', reset);
-      box.addEventListener('click', handleClickBox);
-      reset();
+      function resetGame() {
+        playing = false;
+        clearInterval(gameTimer);
+        clearTimeout(moleTimer);
+        activeMole = -1;
+        score = 0;
+        timeLeft = TOTAL_TIME;
+        scoreEl.textContent = '0';
+        timeLeftEl.textContent = String(TOTAL_TIME);
+        timerBarEl.style.width = '100%';
+        statusEl.textContent = '点击"开始游戏"来挑战！';
+        statusEl.className = 'status';
+        giftModalEl.classList.remove('show');
+        initBoard();
+      }
+
+      startBtn.addEventListener('click', startGame);
+      restartBtn.addEventListener('click', resetGame);
+      closeModalBtn.addEventListener('click', () => giftModalEl.classList.remove('show'));
+      giftModalEl.addEventListener('click', e => {
+        if (e.target === giftModalEl) giftModalEl.classList.remove('show');
+      });
+
+      initBoard();
     </script>
   </body>
 </html>
