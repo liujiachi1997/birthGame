@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>反应速度测试</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .reaction-box {
+        width: min(520px, 90vw);
+        height: 260px;
+        border-radius: 14px;
+        border: 1px solid #334070;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        font-weight: 800;
+        user-select: none;
+        cursor: pointer;
+        background: #7a1f2a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>⚡ 反应速度测试</h1>
+        <a class="link-btn" href="./index.html">返回首页</a>
+      </div>
+
+      <div class="panel row">
+        <button id="startBtn">开始测试</button>
+        <button id="resetBtn">清空记录</button>
+        <span>最佳成绩：<strong id="best">--</strong></span>
+      </div>
+
+      <div class="panel">
+        <div id="box" class="reaction-box">点击“开始测试”</div>
+        <p id="status" class="status"></p>
+      </div>
+    </div>
+
+    <script>
+      const startBtn = document.getElementById('startBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const box = document.getElementById('box');
+      const statusEl = document.getElementById('status');
+      const bestEl = document.getElementById('best');
+
+      let waiting = false;
+      let ready = false;
+      let startTime = 0;
+      let timer = null;
+      let best = null;
+
+      function setBox(text, bg) {
+        box.textContent = text;
+        box.style.background = bg;
+      }
+
+      function start() {
+        clearTimeout(timer);
+        waiting = true;
+        ready = false;
+        setBox('等待变绿后点击！', '#7a1f2a');
+        statusEl.textContent = '';
+
+        const delay = 1200 + Math.random() * 2200;
+        timer = setTimeout(() => {
+          waiting = false;
+          ready = true;
+          startTime = performance.now();
+          setBox('现在点击！', '#156f44');
+        }, delay);
+      }
+
+      function handleClickBox() {
+        if (waiting) {
+          clearTimeout(timer);
+          waiting = false;
+          setBox('太快了！请重新开始', '#7a1f2a');
+          statusEl.textContent = '你抢跑了。';
+          statusEl.className = 'status danger';
+          return;
+        }
+
+        if (!ready) return;
+
+        const ms = Math.round(performance.now() - startTime);
+        ready = false;
+        setBox('点击“开始测试”再来一局', '#1c2a61');
+        statusEl.textContent = `你的反应时间：${ms} ms`;
+        statusEl.className = 'status success';
+
+        if (best === null || ms < best) {
+          best = ms;
+          bestEl.textContent = `${best} ms`;
+        }
+      }
+
+      function reset() {
+        clearTimeout(timer);
+        waiting = false;
+        ready = false;
+        best = null;
+        bestEl.textContent = '--';
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+        setBox('点击“开始测试”', '#1c2a61');
+      }
+
+      startBtn.addEventListener('click', start);
+      resetBtn.addEventListener('click', reset);
+      box.addEventListener('click', handleClickBox);
+      reset();
+    </script>
+  </body>
+</html>

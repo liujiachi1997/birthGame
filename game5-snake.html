@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>贪吃蛇</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>🐍 贪吃蛇</h1>
+        <a class="link-btn" href="./index.html">返回首页</a>
+      </div>
+
+      <div class="panel row">
+        <span>得分：<strong id="score">0</strong></span>
+        <button id="restartBtn">重新开始</button>
+      </div>
+
+      <div class="panel">
+        <canvas id="canvas" width="420" height="420"></canvas>
+        <p id="status" class="status">方向键控制移动，避免撞墙或撞到自己。</p>
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const scoreEl = document.getElementById('score');
+      const statusEl = document.getElementById('status');
+      const restartBtn = document.getElementById('restartBtn');
+
+      const size = 21;
+      const cell = 20;
+      let snake = [];
+      let dir = { x: 1, y: 0 };
+      let nextDir = { x: 1, y: 0 };
+      let food = { x: 10, y: 10 };
+      let score = 0;
+      let timer = null;
+      let ended = false;
+
+      function placeFood() {
+        while (true) {
+          const x = Math.floor(Math.random() * size);
+          const y = Math.floor(Math.random() * size);
+          if (!snake.some((s) => s.x === x && s.y === y)) {
+            food = { x, y };
+            return;
+          }
+        }
+      }
+
+      function drawCell(x, y, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x * cell, y * cell, cell - 1, cell - 1);
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let x = 0; x < size; x++) {
+          for (let y = 0; y < size; y++) {
+            drawCell(x, y, '#0d1430');
+          }
+        }
+
+        drawCell(food.x, food.y, '#ef476f');
+        snake.forEach((part, i) => drawCell(part.x, part.y, i === 0 ? '#31c48d' : '#5b8cff'));
+      }
+
+      function step() {
+        if (ended) return;
+
+        dir = nextDir;
+        const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+        if (head.x < 0 || head.x >= size || head.y < 0 || head.y >= size) {
+          gameOver('撞墙了，游戏结束。');
+          return;
+        }
+
+        if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+          gameOver('撞到自己了，游戏结束。');
+          return;
+        }
+
+        snake.unshift(head);
+
+        if (head.x === food.x && head.y === food.y) {
+          score += 1;
+          scoreEl.textContent = String(score);
+          placeFood();
+        } else {
+          snake.pop();
+        }
+
+        render();
+      }
+
+      function gameOver(text) {
+        ended = true;
+        clearInterval(timer);
+        statusEl.textContent = text;
+        statusEl.className = 'status danger';
+      }
+
+      function init() {
+        clearInterval(timer);
+        snake = [
+          { x: 5, y: 10 },
+          { x: 4, y: 10 },
+          { x: 3, y: 10 }
+        ];
+        dir = { x: 1, y: 0 };
+        nextDir = { x: 1, y: 0 };
+        score = 0;
+        ended = false;
+        scoreEl.textContent = '0';
+        statusEl.textContent = '方向键控制移动，避免撞墙或撞到自己。';
+        statusEl.className = 'status';
+        placeFood();
+        render();
+        timer = setInterval(step, 120);
+      }
+
+      document.addEventListener('keydown', (e) => {
+        const map = {
+          ArrowUp: { x: 0, y: -1 },
+          ArrowDown: { x: 0, y: 1 },
+          ArrowLeft: { x: -1, y: 0 },
+          ArrowRight: { x: 1, y: 0 }
+        };
+        const d = map[e.key];
+        if (!d) return;
+        e.preventDefault();
+        if (d.x === -dir.x && d.y === -dir.y) return;
+        nextDir = d;
+      });
+
+      restartBtn.addEventListener('click', init);
+      init();
+    </script>
+  </body>
+</html>

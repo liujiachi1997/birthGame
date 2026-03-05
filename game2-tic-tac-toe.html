@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>井字棋</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .ttt-board {
+        grid-template-columns: repeat(3, 90px);
+      }
+
+      .cell {
+        width: 90px;
+        height: 90px;
+        font-size: 42px;
+        font-weight: 700;
+        border-radius: 12px;
+        border: 1px solid #334070;
+        background: #101735;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>⭕❌ 井字棋</h1>
+        <a class="link-btn" href="./index.html">返回首页</a>
+      </div>
+
+      <div class="panel">
+        <p id="status" class="status">当前回合：X</p>
+        <button id="resetBtn">重新开始</button>
+      </div>
+
+      <div class="panel">
+        <div id="board" class="board ttt-board"></div>
+      </div>
+    </div>
+
+    <script>
+      const boardEl = document.getElementById('board');
+      const statusEl = document.getElementById('status');
+      const resetBtn = document.getElementById('resetBtn');
+
+      let board = Array(9).fill('');
+      let current = 'X';
+      let ended = false;
+
+      const lines = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6]
+      ];
+
+      function checkWinner() {
+        for (const [a, b, c] of lines) {
+          if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+            return board[a];
+          }
+        }
+        if (board.every(Boolean)) return 'draw';
+        return null;
+      }
+
+      function render() {
+        boardEl.innerHTML = '';
+        board.forEach((v, i) => {
+          const btn = document.createElement('button');
+          btn.className = 'cell';
+          btn.textContent = v;
+          btn.addEventListener('click', () => move(i));
+          boardEl.appendChild(btn);
+        });
+      }
+
+      function move(i) {
+        if (ended || board[i]) return;
+        board[i] = current;
+        const result = checkWinner();
+        if (result === 'X' || result === 'O') {
+          ended = true;
+          statusEl.textContent = `胜者：${result}`;
+          statusEl.className = 'status success';
+        } else if (result === 'draw') {
+          ended = true;
+          statusEl.textContent = '平局！';
+          statusEl.className = 'status warning';
+        } else {
+          current = current === 'X' ? 'O' : 'X';
+          statusEl.textContent = `当前回合：${current}`;
+          statusEl.className = 'status';
+        }
+        render();
+      }
+
+      function reset() {
+        board = Array(9).fill('');
+        current = 'X';
+        ended = false;
+        statusEl.textContent = '当前回合：X';
+        statusEl.className = 'status';
+        render();
+      }
+
+      resetBtn.addEventListener('click', reset);
+      reset();
+    </script>
+  </body>
+</html>

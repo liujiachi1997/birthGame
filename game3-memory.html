@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>记忆翻牌</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .memory-board {
+        grid-template-columns: repeat(4, 78px);
+      }
+
+      .memory-card {
+        width: 78px;
+        height: 78px;
+        border-radius: 12px;
+        border: 1px solid #334070;
+        background: #111a3d;
+        color: #fff;
+        font-size: 32px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .memory-card.open,
+      .memory-card.matched {
+        background: #263a7a;
+      }
+
+      .memory-card.matched {
+        outline: 2px solid #31c48d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>🃏 记忆翻牌</h1>
+        <a class="link-btn" href="./index.html">返回首页</a>
+      </div>
+
+      <div class="panel row">
+        <span>步数：<strong id="steps">0</strong></span>
+        <span>时间：<strong id="time">0</strong> 秒</span>
+        <button id="restartBtn">重新开始</button>
+      </div>
+
+      <div class="panel">
+        <div id="board" class="board memory-board"></div>
+        <p id="status" class="status"></p>
+      </div>
+    </div>
+
+    <script>
+      const icons = ['🍎', '🍌', '🍇', '🍒', '🍉', '🍍', '🥝', '🍑'];
+      const boardEl = document.getElementById('board');
+      const stepsEl = document.getElementById('steps');
+      const timeEl = document.getElementById('time');
+      const statusEl = document.getElementById('status');
+      const restartBtn = document.getElementById('restartBtn');
+
+      let cards = [];
+      let first = null;
+      let lock = false;
+      let steps = 0;
+      let matched = 0;
+      let seconds = 0;
+      let timer = null;
+
+      function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      function startTimer() {
+        if (timer) return;
+        timer = setInterval(() => {
+          seconds += 1;
+          timeEl.textContent = String(seconds);
+        }, 1000);
+      }
+
+      function stopTimer() {
+        clearInterval(timer);
+        timer = null;
+      }
+
+      function render() {
+        boardEl.innerHTML = '';
+        cards.forEach((card, index) => {
+          const div = document.createElement('div');
+          div.className = `memory-card ${card.open ? 'open' : ''} ${card.matched ? 'matched' : ''}`;
+          div.textContent = card.open || card.matched ? card.icon : '❓';
+          div.addEventListener('click', () => flip(index));
+          boardEl.appendChild(div);
+        });
+      }
+
+      function flip(index) {
+        const c = cards[index];
+        if (lock || c.open || c.matched) return;
+
+        startTimer();
+        c.open = true;
+        render();
+
+        if (!first) {
+          first = index;
+          return;
+        }
+
+        steps += 1;
+        stepsEl.textContent = String(steps);
+
+        const a = cards[first];
+        const b = c;
+
+        if (a.icon === b.icon) {
+          a.matched = true;
+          b.matched = true;
+          first = null;
+          matched += 1;
+          if (matched === icons.length) {
+            stopTimer();
+            statusEl.textContent = `通关！你用了 ${steps} 步，耗时 ${seconds} 秒。`;
+            statusEl.className = 'status success';
+          }
+          render();
+        } else {
+          lock = true;
+          setTimeout(() => {
+            a.open = false;
+            b.open = false;
+            first = null;
+            lock = false;
+            render();
+          }, 700);
+        }
+      }
+
+      function init() {
+        stopTimer();
+        const deck = shuffle([...icons, ...icons]);
+        cards = deck.map((icon) => ({ icon, open: false, matched: false }));
+        first = null;
+        lock = false;
+        steps = 0;
+        matched = 0;
+        seconds = 0;
+        stepsEl.textContent = '0';
+        timeEl.textContent = '0';
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+        render();
+      }
+
+      restartBtn.addEventListener('click', init);
+      init();
+    </script>
+  </body>
+</html>

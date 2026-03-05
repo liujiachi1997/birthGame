@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>猜数字</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="topbar">
+        <h1>🎯 猜数字</h1>
+        <a class="link-btn" href="./index.html">返回首页</a>
+      </div>
+
+      <div class="panel">
+        <p>我已经想好了一个 <strong>1~100</strong> 的整数，来猜猜看。</p>
+        <div class="row">
+          <input id="guessInput" type="number" min="1" max="100" placeholder="输入数字" />
+          <button id="guessBtn">提交猜测</button>
+          <button id="restartBtn">重新开始</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p>尝试次数：<strong id="count">0</strong></p>
+        <p class="status" id="message">开始吧！</p>
+      </div>
+    </div>
+
+    <script>
+      let target = Math.floor(Math.random() * 100) + 1;
+      let count = 0;
+      let finished = false;
+
+      const guessInput = document.getElementById('guessInput');
+      const guessBtn = document.getElementById('guessBtn');
+      const restartBtn = document.getElementById('restartBtn');
+      const countEl = document.getElementById('count');
+      const messageEl = document.getElementById('message');
+
+      function setMessage(text, cls) {
+        messageEl.textContent = text;
+        messageEl.className = 'status ' + (cls || '');
+      }
+
+      function guess() {
+        if (finished) return;
+
+        const value = Number(guessInput.value);
+        if (!value || value < 1 || value > 100) {
+          setMessage('请输入 1~100 的有效数字。', 'warning');
+          return;
+        }
+
+        count += 1;
+        countEl.textContent = String(count);
+
+        if (value === target) {
+          setMessage('恭喜你猜对了！🎉', 'success');
+          finished = true;
+          return;
+        }
+
+        if (value < target) {
+          setMessage('小了，再试试。', 'warning');
+        } else {
+          setMessage('大了，再试试。', 'warning');
+        }
+      }
+
+      function restart() {
+        target = Math.floor(Math.random() * 100) + 1;
+        count = 0;
+        finished = false;
+        countEl.textContent = '0';
+        guessInput.value = '';
+        setMessage('已重置，继续挑战！', '');
+        guessInput.focus();
+      }
+
+      guessBtn.addEventListener('click', guess);
+      restartBtn.addEventListener('click', restart);
+      guessInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') guess();
+      });
+    </script>
+  </body>
+</html>
